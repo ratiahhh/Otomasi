@@ -15,7 +15,7 @@ network:
     eth0.10:
       id: 10
       link: eth0
-      addresses: [192.168.A.1/24]
+      addresses: [192.168.6.1/24]
       dhcp4: no
 EOF
 
@@ -25,9 +25,9 @@ sudo netplan apply
 # Konfigurasi DHCP
 echo "Mengkonfigurasi DHCP..."
 sudo bash -c 'cat > /etc/dhcp/dhcpd.conf' << EOF
-subnet 192.168.A.0 netmask 255.255.255.0 {
-  range 192.168.A.10 192.168.A.100;
-  option routers 192.168.A.1;
+subnet 192.168.6.0 netmask 255.255.255.0 {
+  range 192.168.6.10 192.168.6.100;
+  option routers 192.168.6.1;
   option domain-name-servers 8.8.8.8, 8.8.4.4;
 }
 EOF
