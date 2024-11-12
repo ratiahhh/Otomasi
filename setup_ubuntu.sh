@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Update dan install DHCP server
+# Update Sama install DHCP server
 sudo apt update && sudo apt install -y isc-dhcp-server iptables-persistent
 
 # Konfigurasi VLAN
@@ -19,7 +19,7 @@ network:
       dhcp4: no
 EOF
 
-# Terapkan konfigurasi Netplan
+# Konfigurasi Netplan
 sudo netplan apply
 
 # Konfigurasi DHCP
@@ -32,15 +32,15 @@ subnet 192.168.6.0 netmask 255.255.255.0 {
 }
 EOF
 
-# Restart DHCP server
+# Restart DHCP Server
 sudo systemctl restart isc-dhcp-server
 
-# Aktifkan IP forwarding
+# Aktifin IP forwarding
 echo "Mengaktifkan IP forwarding..."
 sudo sysctl -w net.ipv4.ip_forward=1
 sudo bash -c 'echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf'
 
-# Konfigurasi NAT agar client dapat mengakses internet
+# Konfigurasi NAT biar client dapat akses internet
 echo "Mengkonfigurasi NAT..."
 sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 sudo netfilter-persistent save
