@@ -3,9 +3,9 @@
 # Variabel Konfigurasi
 VLAN_INTERFACE="eth1.10"
 VLAN_ID=10
-IP_ADDR="192.168.24.1/24"      # IP address kanggo interface VLAN nang Ubuntu
+IP_ADDR="192.168.6.1/24"      # IP address kanggo interface VLAN nang Ubuntu
 DHCP_CONF="/etc/dhcp/dhcpd.conf"
-SWITCH_IP="192.168.24.35"       # IP Cisco Switch sing diperbarui
+SWITCH_IP="192.168.6.35"       # IP Cisco Switch sing diperbarui
 MIKROTIK_IP="192.168.200.1"     # IP MikroTik sing anyar
 USER_SWITCH="root"              # Username SSH kanggo Cisco Switch
 USER_MIKROTIK="admin"           # Username SSH default MikroTik
@@ -40,9 +40,9 @@ ip link set up dev $VLAN_INTERFACE
 echo "📡 Setting DHCP... IP kudu adil rek, ojok rebutan kayak lek dodolan cilok nang pasar! 😎"
 cat <<EOL | sudo tee $DHCP_CONF
 # Konfigurasi subnet kanggo VLAN 10
-subnet 192.168.24.0 netmask 255.255.255.0 {
-    range 192.168.24.10 192.168.24.100;
-    option routers 192.168.24.1;
+subnet 192.168.6.0 netmask 255.255.255.0 {
+    range 192.168.6.10 192.168.6.100;
+    option routers 192.168.6.1;
     option subnet-mask 255.255.255.0;
     option domain-name-servers 8.8.8.8, 8.8.4.4;
     option domain-name "example.local";
@@ -61,7 +61,7 @@ network:
      eth1.10:
        id: 10
        link: eth1
-       addresses: [192.168.24.1/24]
+       addresses: [192.168.6.1/24]
 EOF
 
 sudo netplan apply
@@ -96,16 +96,16 @@ echo "📡 Saiki giliran MikroTik... ayo bro, iki tak konfigurasi nganggo skill 
 if [ -z "$PASSWORD_MIKROTIK" ]; then
     ssh -o StrictHostKeyChecking=no $USER_MIKROTIK@$MIKROTIK_IP <<EOF
 interface vlan add name=vlan10 vlan-id=$VLAN_ID interface=ether1
-ip address add address=192.168.24.1/24 interface=vlan10      # Sesuaikan karo IP nang VLAN Ubuntu
+ip address add address=192.168.6.1/24 interface=vlan10      # Sesuaikan karo IP nang VLAN Ubuntu
 ip address add address=192.168.200.1/24 interface=ether2     # IP address MikroTik nang jaringan liyane
-ip route add dst-address=192.168.24.0/24 gateway=192.168.24.1
+ip route add dst-address=192.168.6.0/24 gateway=192.168.6.1
 EOF
 else
     sshpass -p "$PASSWORD_MIKROTIK" ssh -o StrictHostKeyChecking=no $USER_MIKROTIK@$MIKROTIK_IP <<EOF
 interface vlan add name=vlan10 vlan-id=$VLAN_ID interface=ether1
-ip address add address=192.168.24.1/24 interface=vlan10      # Sesuaikan karo IP nang VLAN Ubuntu
+ip address add address=192.168.6.1/24 interface=vlan10      # Sesuaikan karo IP nang VLAN Ubuntu
 ip address add address=192.168.200.1/24 interface=ether2     # IP address MikroTik nang jaringan liyane
-ip route add dst-address=192.168.24.0/24 gateway=192.168.24.1
+ip route add dst-address=192.168.6.0/24 gateway=192.168.6.1
 EOF
 fi
 
