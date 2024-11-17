@@ -1,112 +1,80 @@
 #!/bin/bash
 
-# Variabel Konfigurasi
-VLAN_INTERFACE="eth1.10"
-VLAN_ID=10
-IP_ADDR="192.168.6.1/24"      # IP address kanggo interface VLAN nang Ubuntu
-DHCP_CONF="/etc/dhcp/dhcpd.conf"
-SWITCH_IP="192.168.6.35"       # IP Cisco Switch sing diperbarui
-MIKROTIK_IP="192.168.200.1"     # IP MikroTik sing anyar
-USER_SWITCH="root"              # Username SSH kanggo Cisco Switch
-USER_MIKROTIK="admin"           # Username SSH default MikroTik
-PASSWORD_SWITCH="root"          # Password kanggo Cisco Switch
-PASSWORD_MIKROTIK=""            # Kosongno yen MikroTik ora nduwe password
+# 🛠 VINCENT AUTOMATION SCRIPT 🛠
+# Untuk konfigurasi Ubuntu Server, Cisco Switch, dan Mikrotik
+# By Vincent
 
-set -e
+echo "==============================="
+echo "       🔥 VINCENT SCRIPT 🔥       "
+echo "==============================="
 
-echo "🎉 Skrip Otomasi diwiwiti! Gaspol Rek, saiki jadi Sultan Konfigurasi! 😹"
+# 🌟 STEP 1: Konfigurasi di Ubuntu Server 🌟
+echo "Configuring Ubuntu Server..."
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y isc-dhcp-server vlan net-tools iptables-persistent
 
-# Nambah Repositori Kartolo
-echo "🍩 Lagi nambah repo Kartolo... servere ngopi dhisik, ben ora ngambek! ☕"
-cat <<EOF | sudo tee /etc/apt/sources.list
-deb http://kartolo.sby.datautama.net.id/ubuntu/ focal main restricted universe multiverse
-deb http://kartolo.sby.datautama.net.id/ubuntu/ focal-updates main restricted universe multiverse
-deb http://kartolo.sby.datautama.net.id/ubuntu/ focal-security main restricted universe multiverse
-deb http://kartolo.sby.datautama.net.id/ubuntu/ focal-backports main restricted universe multiverse
-deb http://kartolo.sby.datautama.net.id/ubuntu/ focal-proposed main restricted universe multiverse
-EOF
+# VLAN Configuration
+echo "Setting up VLAN interface eth1.10..."
+sudo ip link add link eth1 name eth1.10 type vlan id 10
+sudo ip addr add 192.168.6.1/24 dev eth1.10
+sudo ip link set eth1.10 up
 
-sudo apt update
-sudo apt install sshpass -y
-sudo apt install -y isc-dhcp-server iptables iptables-persistent
-
-# 1. Konfigurasi VLAN nang Ubuntu Server
-echo "🔧 Ngawe VLAN nang Ubuntu... tenang lek, kabel iki tak upgrade dadi kapal Titanic sing ora karam! 😹"
-ip link add link eth1 name $VLAN_INTERFACE type vlan id $VLAN_ID
-ip addr add $IP_ADDR dev $VLAN_INTERFACE
-ip link set up dev $VLAN_INTERFACE
-
-# 2. Konfigurasi DHCP Server
-echo "📡 Setting DHCP... IP kudu adil rek, ojok rebutan kayak lek dodolan cilok nang pasar! 😎"
-cat <<EOL | sudo tee $DHCP_CONF
-# Konfigurasi subnet kanggo VLAN 10
+# DHCP Server Configuration
+echo "Configuring DHCP Server..."
+sudo bash -c 'cat <<EOF > /etc/dhcp/dhcpd.conf
 subnet 192.168.6.0 netmask 255.255.255.0 {
-    range 192.168.6.10 192.168.6.100;
-    option routers 192.168.6.1;
-    option subnet-mask 255.255.255.0;
-    option domain-name-servers 8.8.8.8, 8.8.4.4;
-    option domain-name "example.local";
+  range 192.168.6.100 192.168.6.200;
+  option routers 192.168.6.1;
+  option domain-name-servers 8.8.8.8;
 }
-EOL
+EOF'
 
-cat <<EOF | sudo tee /etc/netplan/01-netcfg.yaml
-network:
-  version: 2
-  ethernets:
-    eth0:
-     dhcp4: true
-    eth1:
-      dhcp4: no
-  vlans:
-     eth1.10:
-       id: 10
-       link: eth1
-       addresses: [192.168.6.1/24]
-EOF
-
-sudo netplan apply
-
-# Restart DHCP server kanggo nerapkan konfigurasi anyar
-echo "🔄 Restart DHCP... tenang, server iki tak pijet sek ben ra spaneng! 😹"
+sudo sed -i 's/INTERFACESv4=""/INTERFACESv4="eth1.10"/g' /etc/default/isc-dhcp-server
 sudo systemctl restart isc-dhcp-server
-sudo systemctl status isc-dhcp-server
+sudo systemctl enable isc-dhcp-server
 
-# 3. Konfigurasi Routing nang Ubuntu Server
-echo "🛣️ Gawe routing... datane saiki lancar rek, kayak dalan tol ora ono lampu abang! 🚦"
-ip route add 192.168.200.0/24 via $MIKROTIK_IP
+# Enable IP Forwarding and NAT
+echo "Enabling IP Forwarding and NAT..."
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo bash -c 'echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf'
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+sudo iptables-save | sudo tee /etc/iptables/rules.v4
 
-# 4. Konfigurasi Cisco Switch liwat SSH
-echo "🤖 Ngobrol karo Cisco Switch... ayo ndang rampung, lek switch iki ojok ngambek! 🥲"
-sshpass -p "$PASSWORD_SWITCH" ssh -o StrictHostKeyChecking=no $USER_SWITCH@$SWITCH_IP <<EOF
+# Test connection
+echo "Testing Internet connection..."
+ping -c 4 8.8.8.8
+
+echo "Ubuntu Server configuration completed!"
+echo "==============================="
+
+# 🌟 STEP 2: Cisco Switch Configuration 🌟
+echo "Copy the following configuration to your Cisco Switch CLI:"
+echo "
 enable
 configure terminal
-vlan $VLAN_ID
-name VLAN10
-exit
-interface e0/1
+vlan 10
+name VINCENT_VLAN
+interface Ethernet0/1
 switchport mode access
-switchport access vlan $VLAN_ID
-exit
+switchport access vlan 10
 end
-write memory
-EOF
+wr
+"
+echo "==============================="
 
-# 5. Konfigurasi MikroTik liwat SSH
-echo "📡 Saiki giliran MikroTik... ayo bro, iki tak konfigurasi nganggo skill dewa! 💻"
-if [ -z "$PASSWORD_MIKROTIK" ]; then
-    ssh -o StrictHostKeyChecking=no $USER_MIKROTIK@$MIKROTIK_IP <<EOF
-interface vlan add name=vlan10 vlan-id=$VLAN_ID interface=ether1
-ip address add address=192.168.6.1/24 interface=vlan10      # Sesuaikan karo IP nang VLAN Ubuntu
-ip address add address=192.168.200.1/24 interface=ether2     # IP address MikroTik nang jaringan liyane
-ip route add dst-address=192.168.6.0/24 gateway=192.168.6.1
-EOF
-else
-    sshpass -p "$PASSWORD_MIKROTIK" ssh -o StrictHostKeyChecking=no $USER_MIKROTIK@$MIKROTIK_IP <<EOF
-interface vlan add name=vlan10 vlan-id=$VLAN_ID interface=ether1
-ip address add address=192.168.6.1/24 interface=vlan10      # Sesuaikan karo IP nang VLAN Ubuntu
-ip address add address=192.168.200.1/24 interface=ether2     # IP address MikroTik nang jaringan liyane
-ip route add dst-address=192.168.6.0/24 gateway=192.168.6.1
-EOF
-fi
+# 🌟 STEP 3: Mikrotik Configuration 🌟
+echo "Copy the following configuration to your Mikrotik Router CLI:"
+echo "
+/system identity set name=\"Vincent-Router\"
+/ip address add address=192.168.6.2/24 interface=ether1
+/ip address add address=192.168.200.1/24 interface=ether2
+/ip route add dst-address=0.0.0.0/0 gateway=192.168.6.1
+/ip dhcp-relay add name=relay interface=ether1 dhcp-server=192.168.6.1 local-address=192.168.6.2
+/ping 8.8.8.8 count=4
+/system script run [system script find name=\"save-config\"]
+"
+echo "==============================="
 
-echo "🎉 Skrip rampung! Saiki sampeyan dadi Raja Otomasi, gaspol maneh rek! 👑"
+# Selesai
+echo "🔥 All configurations are completed! 🔥"
+echo "Make sure to verify the setup for DHCP and Internet connectivity on the client devices."
