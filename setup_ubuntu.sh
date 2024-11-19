@@ -11,7 +11,6 @@ print_center() {
 
 # ASCII Art dari input
 ascii_art="
-                                                                                                
  ____      ____ ____ _____   ______        _____       ______ _____   ______  _________________ 
 |    |    |    |    |\    \ |\     \   ___|\    \  ___|\     |\    \ |\     \/                 \
 |    |    |    |    |\\    \| \     \ /    /\    \|     \     \\    \| \     \______     ______/
@@ -45,24 +44,26 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Config IP, VLAN, dan lain-lain
-echo "Mengkonfigurasi IP, VLAN, lan nambah Kartolo Repo kanggo Ubuntu 20.04... 😹"
-
 # Konfigurasi jaringan
-echo "
-auto eth1
-iface eth1 inet static
-address 192.168.6.1
-netmask 255.255.255.0
-" >> /etc/network/interfaces
+echo "Mengkonfigurasi IP, VLAN, dan NAT..."
+cat <<EOF > /etc/netplan/01-netcfg.yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth1:
+      dhcp4: no
+      addresses:
+        - 192.168.6.1/24
+  vlans:
+    eth1.10:
+      id: 10
+      link: eth1
+      addresses:
+        - 192.168.10.1/24
+EOF
 
-echo "
-auto eth1.10
-iface eth1.10 inet static
-address 192.168.6.1
-netmask 255.255.255.0
-vlan-raw-device eth1
-" >> /etc/network/interfaces
+netplan apply
 
 # Install DHCP server
 echo "Menginstal DHCP server... 😹"
@@ -74,17 +75,17 @@ subnet 192.168.6.0 netmask 255.255.255.0 {
     range 192.168.6.50 192.168.6.100;
     option routers 192.168.6.1;
     option domain-name-servers 8.8.8.8, 8.8.4.4;
+}
 
-    # Konfigurasi fix IP untuk VPC Fantasia
-    host fantasia {
-        hardware ethernet 00:11:22:33:44:55; # Ganti dengan MAC address
-        fixed-address 192.168.6.10;
-    }
+subnet 192.168.10.0 netmask 255.255.255.0 {
+    range 192.168.10.50 192.168.10.100;
+    option routers 192.168.10.1;
+    option domain-name-servers 8.8.8.8, 8.8.4.4;
 }
 EOT
 
 # DHCP server untuk eth1
-sed -i 's/INTERFACESv4=""/INTERFACESv4="eth1"/' /etc/default/isc-dhcp-server
+sed -i 's/INTERFACESv4=""/INTERFACESv4="eth1 eth1.10"/' /etc/default/isc-dhcp-server
 
 # Forwarding dan NAT
 echo 1 > /proc/sys/net/ipv4/ip_forward
@@ -100,7 +101,6 @@ deb http://kartolo.sby.datautama.net.id/ubuntu/ focal main restricted universe m
 deb http://kartolo.sby.datautama.net.id/ubuntu/ focal-updates main restricted universe multiverse
 deb http://kartolo.sby.datautama.net.id/ubuntu/ focal-security main restricted universe multiverse
 deb http://kartolo.sby.datautama.net.id/ubuntu/ focal-backports main restricted universe multiverse
-deb http://kartolo.sby.datautama.net.id/ubuntu/ focal-proposed main restricted universe multiverse
 EOF
 
 # Update sistem
@@ -109,7 +109,6 @@ apt update
 
 # Restart layanan
 echo "Restarting networking dan DHCP services... 😹"
-systemctl restart networking
 systemctl restart isc-dhcp-server
 
 echo "Konfigurasi rampung, Vincent! Sekarang jaringannya udah siap tempur! 😹"
